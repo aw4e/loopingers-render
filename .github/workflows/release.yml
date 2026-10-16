@@ -63,7 +63,8 @@ jobs:
 
   build-windows-cuda:
     name: Build Windows Desktop App (NVIDIA CUDA)
-    runs-on: windows-latest
+    # CUDA 12.6 supports Visual Studio 2017-2022 only; windows-latest ships VS 2026.
+    runs-on: windows-2022
     env:
       LIBCLANG_PATH: C:\Program Files\LLVM\bin
       # The runner has no GPU, so list target architectures instead of "native".
