@@ -68,6 +68,9 @@ jobs:
       LIBCLANG_PATH: C:\Program Files\LLVM\bin
       # The runner has no GPU, so list target architectures instead of "native".
       CMAKE_CUDA_ARCHITECTURES: "61;75;86;89"
+      # Ninja calls nvcc directly; the Visual Studio generator needs the CUDA
+      # MSBuild integration, which is not found on the runner ("No CUDA toolset found").
+      CMAKE_GENERATOR: Ninja
 
     steps:
       - name: Checkout Repository
@@ -77,6 +80,9 @@ jobs:
         uses: Swatinem/rust-cache@v2
         with:
           key: cuda
+
+      - name: Set up MSVC environment
+        uses: ilammy/msvc-dev-cmd@v1
 
       - name: Install CUDA Toolkit (build tools only)
         uses: Jimver/cuda-toolkit@v0.2.24
