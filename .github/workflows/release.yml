@@ -60,3 +60,61 @@ jobs:
           files: dist/LoopKaraokeStudio-Windows-x64.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  build-windows-cuda:
+    name: Build Windows Desktop App (NVIDIA CUDA)
+    runs-on: windows-latest
+    env:
+      LIBCLANG_PATH: C:\Program Files\LLVM\bin
+      # The runner has no GPU, so list target architectures instead of "native".
+      CMAKE_CUDA_ARCHITECTURES: "61;75;86;89"
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Cache Cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: cuda
+
+      - name: Install CUDA Toolkit (build tools only)
+        uses: Jimver/cuda-toolkit@v0.2.24
+        id: cuda
+        with:
+          cuda: '12.6.2'
+          method: network
+          sub-packages: '["nvcc", "cudart", "cublas", "cublas_dev", "visual_studio_integration"]'
+
+      - name: Build release executable
+        run: cargo build --release --features cuda
+
+      - name: Download FFmpeg
+        uses: FedericoCarboni/setup-ffmpeg@v3
+        with:
+          ffmpeg-version: release
+
+      - name: Package
+        shell: pwsh
+        run: |
+          $dist = "dist/LoopKaraokeStudio"
+          New-Item -ItemType Directory -Force "$dist/assets" | Out-Null
+          Copy-Item target/release/loopkaraoke-studio.exe "$dist/LoopKaraokeStudio.exe"
+          Copy-Item -Recurse assets/effects "$dist/assets/effects"
+          $ffmpegDir = Split-Path (Get-Command ffmpeg).Source
+          Copy-Item "$ffmpegDir/ffmpeg.exe", "$ffmpegDir/ffprobe.exe" $dist
+          # Runtime DLLs so users only need the NVIDIA driver, not the toolkit.
+          $cudaBin = Join-Path $env:CUDA_PATH "bin"
+          Copy-Item "$cudaBin/cudart64_*.dll", "$cudaBin/cublas64_*.dll", "$cudaBin/cublasLt64_*.dll" $dist
+          Compress-Archive -Path $dist -DestinationPath dist/LoopKaraokeStudio-Windows-x64-CUDA.zip
+
+      - name: Upload CUDA build to GitHub Release
+        uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch'
+        with:
+          name: "LoopKaraoke Studio ${{ github.ref_name }}"
+          draft: false
+          prerelease: false
+          files: dist/LoopKaraokeStudio-Windows-x64-CUDA.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
